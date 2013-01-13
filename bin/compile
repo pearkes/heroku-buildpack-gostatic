@@ -1,0 +1,155 @@
+#!/bin/bash
+# usage: bin/compile <build-dir> <cache-dir>
+
+# fail fast
+set -eo pipefail
+
+#--------------------------------------------------------------------
+# Variables for use later
+#--------------------------------------------------------------------
+mkdir -p "$1" "$2" # The cache / build directories are dynamic and passed in
+build=$(cd "$1/" && pwd) # Where the magic happens
+cache=$(cd "$2/" && pwd) # Cache directory, to put things for faster deploys
+ver=${GOVERSION:-1.0.3} # The version of go we want!
+file=${GOFILE:-go$ver.$(uname|tr A-Z a-z)-amd64.tar.gz} # The go file we're downloading
+url=${GOURL:-http://go.googlecode.com/files/$file} # Where to get go stuff
+buildpack=$(dirname $(dirname $0))
+venv=$cache/venv # Virtualenv cache
+mkdir -p $cache/pip # pip cache
+python=python2.7 # The python we use for go dependencies
+PATH=$venv/bin:$PATH
+lpdir=`cd $(dirname $0); cd ..; pwd` # We need to know where conf/httpd.conf is
+apacheversion="2.2.19" # The version of apache we want
+apachepath="apache" # The apache directory
+
+#--------------------------------------------------------------------
+# Virtualenv for Go dependencies
+#--------------------------------------------------------------------
+virtualenv() {
+    python "$buildpack/vendor/virtualenv-1.7/virtualenv.py" "$@"
+}
+
+if test -e $build/bin && ! test -d $build/bin
+then
+    echo >&2 " !     File bin exists and is not a directory."
+    exit 1
+fi
+
+#--------------------------------------------------------------------
+# Install or use cached Go
+#--------------------------------------------------------------------
+if test -d $cache/go-$ver/go
+then
+    echo "-----> Using Go $ver"
+else
+    rm -rf $cache/* # be sure not to build up cruft
+    mkdir -p $cache/go-$ver
+    cd $cache/go-$ver
+    echo -n "-----> Installing Go $ver..."
+    curl -sO $url
+    tar zxf $file
+    rm -f $file
+    echo " done"
+fi
+
+#--------------------------------------------------------------------
+# Now that Go is installed, configure it.
+#--------------------------------------------------------------------
+GOROOT=$cache/go-$ver/go export GOROOT
+GOPATH=$build/.heroku/g export GOPATH
+PATH=$GOROOT/bin:$PATH
+
+#--------------------------------------------------------------------
+# Get Apache, try first from cache
+#--------------------------------------------------------------------
+# Apache cache
+rm -rf $apachepath
+if [ -d $cache/$apachepath ]; then
+  cp -r $cache/$apachepath $apachepath
+fi
+
+if [ ! -d $apachepath ]; then
+  APACHE_URL="https://s3.amazonaws.com/php-lp/apache-$apacheversion.tar.gz"
+  echo -n "       Installing Apache v$apacheversion..."
+  cd $build;
+  curl --silent --max-time 60 --location $APACHE_URL | tar xz
+  cp $lpdir/conf/httpd.conf apache/conf/httpd.conf;
+  # Repack apache cache
+  cp -r $apachepath $cache/$apachepath
+  echo " done"
+fi
+
+#--------------------------------------------------------------------
+# Dependencies for Go, see if we have them first.
+#--------------------------------------------------------------------
+if ! (which hg > /dev/null && which bzr > /dev/null)
+then
+    echo -n "       Installing Virtualenv..."
+    virtualenv --python $python --distribute --never-download --prompt='(venv) ' $venv > /dev/null 2>&1
+    . $venv/bin/activate > /dev/null 2>&1
+    echo " done"
+
+    echo -n "       Installing Mercurial..."
+    pip install --use-mirrors mercurial > /dev/null 2>&1
+    echo " done"
+
+    echo -n "       Installing Bazaar..."
+    pip install --use-mirrors bzr > /dev/null 2>&1
+    echo " done"
+fi
+
+#--------------------------------------------------------------------
+# Install gostatic if we need it
+#--------------------------------------------------------------------
+if ! (which gostatic > /dev/null)
+then
+    unset GIT_DIR # unset git dir or it will mess with goinstall
+    # The reason this is going to /pearkes instead of the original author,
+    # /piranha, is because it will get a fresh copy and may become incompatible
+    # during a push, which we don't want.
+    echo -n "-----> go get github.com/pearkes/gostatic ..."
+    go get github.com/pearkes/gostatic
+    echo " done"
+
+    echo -n "       go install github.com/pearkes/gostatic ..."
+    go install github.com/pearkes/gostatic
+    echo " done"
+fi
+
+#--------------------------------------------------------------------
+# Move the binaries so we can use them.
+#--------------------------------------------------------------------
+mkdir -p $build/bin
+mv $GOPATH/bin/* $build/bin
+rm -rf $build/.heroku
+
+mkdir -p $build/.profile.d
+echo 'export PATH=$PATH:$HOME/bin' > $build/.profile.d/go.sh
+
+#--------------------------------------------------------------------
+# Compile the site, finally!
+#--------------------------------------------------------------------
+echo "-----> Compiling static site..."
+$build/bin/gostatic $build/config | sed "s/^/       /" # Add indentation
+
+# We should have compiled to out/, if not, fail now.
+if ! test -d $build/out
+then
+    echo >&2 " !     You must compile to folder: out"
+    exit 1
+fi
+
+# Move the static assets so apache can serve them!
+mv $build/out $build/www
+
+#--------------------------------------------------------------------
+# Set-up the shell script that launches apache.
+#--------------------------------------------------------------------
+cat >>$build/boot.sh <<EOF
+export LD_LIBRARY_PATH=/app/apache/lib/
+sed -i 's/Listen 80/Listen '\$PORT'/' /app/apache/conf/httpd.conf
+echo "Launching apache"
+exec /app/apache/bin/httpd -X
+EOF
+# Make it executable
+chmod +x $build/boot.sh

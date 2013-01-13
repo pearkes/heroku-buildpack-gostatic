@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# bin/release <build-dir>
+
+#--------------------------------------------------------------------
+# We set a default_proccess_type so you don't need a Procfile. :)
+#--------------------------------------------------------------------
+cat <<EOF
+---
+default_process_types:
+  web: sh boot.sh
+EOF

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# bin/detect <build-dir>
+set -e
+
+#--------------------------------------------------------------------
+# Gostatic needs a config file (github.com/piranha/gostatic#configuration)
+#--------------------------------------------------------------------
+if test -n "config"
+then echo gostatic
+else echo no; exit 1
+fi
