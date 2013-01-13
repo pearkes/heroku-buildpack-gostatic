@@ -66,6 +66,7 @@ PATH=$GOROOT/bin:$PATH
 rm -rf $apachepath
 if [ -d $cache/$apachepath ]; then
   cp -r $cache/$apachepath $apachepath
+  cp $lpdir/conf/httpd.conf $apachepath/conf/httpd.conf;
 fi
 
 if [ ! -d $apachepath ]; then
@@ -73,7 +74,7 @@ if [ ! -d $apachepath ]; then
   echo -n "       Installing Apache v$apacheversion..."
   cd $build;
   curl --silent --max-time 60 --location $APACHE_URL | tar xz
-  cp $lpdir/conf/httpd.conf apache/conf/httpd.conf;
+  cp $lpdir/conf/httpd.conf $apachepath/conf/httpd.conf;
   # Repack apache cache
   cp -r $apachepath $cache/$apachepath
   echo " done"

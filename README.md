@@ -19,6 +19,26 @@ directory should look a little like this:
 
     $ git push heroku master
     ...
+    -----> Fetching custom git buildpack... done
+    -----> gostatic app detected
+    -----> Installing Go 1.0.3... done
+           Installing Apache v2.2.19... done
+           Installing Virtualenv... done
+           Installing Mercurial... done
+           Installing Bazaar... done
+    -----> go get github.com/pearkes/gostatic ... done
+           go install github.com/pearkes/gostatic ... done
+    -----> Compiling static site...
+           Total pages to render: 6
+    -----> Discovering process types
+           Procfile declares types    -> (none)
+           Default types for gostatic -> web
+    -----> Compiled slug size: 13.5MB
+    -----> Launching... done, v6
+    ...
+
+Your first deploy will be slow, but following deploys should speed
+up dramatically as you use the dependency cache.
 
 Note: Your deploy will fail if you do not have a gostatic `config` file
 in the root of your project.
