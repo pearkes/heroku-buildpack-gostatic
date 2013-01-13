@@ -63,13 +63,13 @@ PATH=$GOROOT/bin:$PATH
 # Get Apache, try first from cache
 #--------------------------------------------------------------------
 # Apache cache
-rm -rf $apachepath
+rm -rf $build/$apachepath
 if [ -d $cache/$apachepath ]; then
   cp -r $cache/$apachepath $build/$apachepath
   cp $lpdir/conf/httpd.conf $build/$apachepath/conf/httpd.conf;
 fi
 
-if [ ! -d $apachepath ]; then
+if [ ! -d $build/$apachepath ]; then
   APACHE_URL="https://s3.amazonaws.com/php-lp/apache-$apacheversion.tar.gz"
   echo -n "       Installing Apache v$apacheversion..."
   cd $build;
