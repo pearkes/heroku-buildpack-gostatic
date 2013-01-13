@@ -1,6 +1,6 @@
 # Heroku Buildpack: gostatic
 
-This is a [Heroku buildpack][buildpack] for
+This is a Heroku [buildpack](http://devcenter.heroku.com/articles/buildpacks) for
 [gostatic](https://github.com/piranha/gostatic), a static site
 builder written by [piranha](https://github.com/piranha).
 
@@ -35,7 +35,7 @@ changes to your fork, then create a test app with
 already have an existing app you may use `heroku config:add
 BUILDPACK_URL=YOUR_GITHUB_GIT_URL` instead of `--buildpack`.
 
-More on [buildpack's]: http://devcenter.heroku.com/articles/buildpacks
+More on [buildpacks](http://devcenter.heroku.com/articles/buildpacks).
 
 ## Thanks
 
